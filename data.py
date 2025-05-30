@@ -3,6 +3,7 @@ import torch
 import PIL
 import glob
 from transformers import CLIPProcessor # Added
+import random # Import the random module
 
 # Constants from customdataset_test.py (or CLIP defaults)
 # For CLIP, the normalization is often part of the processor.
@@ -11,7 +12,7 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406] # Standard ImageNet mean
 IMAGENET_STD = [0.229, 0.224, 0.225]  # Standard ImageNet std
 
 class CLIPDataset(torch.utils.data.Dataset):
-    def __init__(self, good_dir, defect_dir, clip_model_name="openai/clip-vit-base-patch32"): # Added clip_model_name
+    def __init__(self, good_dir, defect_dir, clip_model_name="openai/clip-vit-base-patch32", apply_horizontal_flip=False, apply_vertical_flip=False):
         super().__init__()
         # Store image paths and their corresponding labels
         self.image_data = []
@@ -30,6 +31,10 @@ class CLIPDataset(torch.utils.data.Dataset):
         # Initialize CLIP processor
         self.processor = CLIPProcessor.from_pretrained(clip_model_name)
         
+        # Store augmentation flags
+        self.apply_horizontal_flip = apply_horizontal_flip
+        self.apply_vertical_flip = apply_vertical_flip
+
         # Configure the image_processor to resize to 224x224 and disable center cropping
         self.processor.image_processor.do_resize = True
         self.processor.image_processor.size = {"height": 224, "width": 224}
@@ -44,6 +49,13 @@ class CLIPDataset(torch.utils.data.Dataset):
         
         try:
             image = PIL.Image.open(image_path).convert("RGB")
+
+            # Apply random flips if enabled
+            if self.apply_horizontal_flip and random.random() < 0.5:
+                image = image.transpose(PIL.Image.FLIP_LEFT_RIGHT)
+            if self.apply_vertical_flip and random.random() < 0.5:
+                image = image.transpose(PIL.Image.FLIP_TOP_BOTTOM)
+
             original_size_tuple = image.size # Store original image size as tuple (width, height)
             
             # Convert original_image_size to a normalized FloatTensor

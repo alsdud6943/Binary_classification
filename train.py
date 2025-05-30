@@ -8,6 +8,9 @@ import argparse # Import argparse
 import os # Import os for path operations
 from sklearn.metrics import roc_auc_score # Import for AUC
 # from tqdm import tqdm # Optional: for progress bars
+import datetime
+import json # Import the json module
+import sys # Import sys for stdout redirection
 
 # Configuration values will be set by argparse
 
@@ -31,7 +34,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
 
         # Forward pass
         logits = model(pixel_values, original_image_size) # Pass original_image_size
-        loss = criterion(logits, labels) # BCEWithLogitsLoss expects raw logits
+        loss = criterion(logits, labels) # BCEWithLogitsLoss edxpects raw logits
 
         # Backward pass and optimization
         loss.backward()
@@ -93,88 +96,118 @@ def validate_one_epoch(model, dataloader, criterion, device):
     return epoch_loss, epoch_acc, epoch_auc
 
 def main(args):
-    print(f"Using device: {DEVICE}")
-    print(f"Configuration: {args}")
+    # Generate a unique run ID based on the current timestamp
+    current_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    run_output_dir = os.path.join(args.output_dir, current_time)
+    os.makedirs(run_output_dir, exist_ok=True)
 
-    print("Initializing model...")
-    model = CLIPBinaryClassifier(model_name=args.model_name, hidden_dim=args.hidden_dim).to(DEVICE)
+    # Setup logging to file
+    log_file_path = os.path.join(run_output_dir, "training_log.txt")
+    original_stdout = sys.stdout
+    log_file = open(log_file_path, 'w')
+    sys.stdout = log_file
 
-    print("Trainable parameters:")
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            print(f"  {name}")
-
-    print("Loading training dataset...")
     try:
-        train_dataset = CLIPDataset(
-            good_dir=args.good_train_data_dir, 
-            defect_dir=args.defect_train_data_dir, 
-            clip_model_name=args.model_name, 
-            imagesize=args.image_size
-        )
-        if len(train_dataset) == 0:
-            print(f"Error: No images found in training directories: {args.good_train_data_dir} or {args.defect_train_data_dir}. Please check the paths and ensure images exist.")
-            return # Exit if no images found
+        print(f"Using device: {DEVICE}")
+        print(f"Configuration: {args}")
+        print(f"Saving models and logs to: {run_output_dir}")
+        print(f"Logging console output to: {log_file_path}")
 
-        train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
-    except Exception as e:
-        print(f"Error creating training dataset/dataloader: {e}")
-        print(f"Please ensure the data directories ({args.good_train_data_dir}, {args.defect_train_data_dir}) exist with images, or provide valid data paths.")
-        return
 
-    val_dataloader = None
-    if args.good_val_data_dir and args.defect_val_data_dir:
-        print("Loading validation dataset...")
+        # Save the parsed arguments to a JSON file in the run_output_dir
+        args_save_path = os.path.join(run_output_dir, "training_args.json")
+        with open(args_save_path, 'w') as f:
+            json.dump(vars(args), f, indent=4)
+        print(f"Saved training arguments to: {args_save_path}")
+
+        print("Initializing model...")
+        model = CLIPBinaryClassifier(model_name=args.model_name, hidden_dim=args.hidden_dim).to(DEVICE)
+
+        print("Trainable parameters:")
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                print(f"  {name}")
+
+        print("Loading training dataset...")
         try:
-            val_dataset = CLIPDataset(
-                good_dir=args.good_val_data_dir,
-                defect_dir=args.defect_val_data_dir,
+            train_dataset = CLIPDataset(
+                good_dir=args.good_train_data_dir, 
+                defect_dir=args.defect_train_data_dir, 
                 clip_model_name=args.model_name,
-                imagesize=args.image_size
+                apply_horizontal_flip=args.random_horizontal_flip,  # Pass the new argument
+                apply_vertical_flip=args.random_vertical_flip      # Pass the new argument
             )
-            if len(val_dataset) > 0:
-                val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-            else:
-                print(f"Warning: No images found in validation directories {args.good_val_data_dir} or {args.defect_val_data_dir}. Skipping validation.")
+            if len(train_dataset) == 0:
+                print(f"Error: No images found in training directories: {args.good_train_data_dir} or {args.defect_train_data_dir}. Please check the paths and ensure images exist.")
+                return # Exit if no images found
+
+            train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
         except Exception as e:
-            print(f"Error creating validation dataset/dataloader: {e}. Skipping validation.")
-    else:
-        print("Validation data directories not specified, skipping validation.")
+            print(f"Error creating training dataset/dataloader: {e}")
+            print(f"Please ensure the data directories ({args.good_train_data_dir}, {args.defect_train_data_dir}) exist with images, or provide valid data paths.")
+            return
 
-    optimizer = optim.Adam(model.classifier.parameters(), lr=args.learning_rate)
-    criterion = nn.BCEWithLogitsLoss()
+        val_dataloader = None
+        if args.good_val_data_dir and args.defect_val_data_dir:
+            print("Loading validation dataset...")
+            try:
+                # Augmentations are typically not applied to the validation set
+                val_dataset = CLIPDataset(
+                    good_dir=args.good_val_data_dir,
+                    defect_dir=args.defect_val_data_dir,
+                    clip_model_name=args.model_name,
+                    apply_horizontal_flip=False, # Explicitly False for validation
+                    apply_vertical_flip=False  # Explicitly False for validation
+                )
+                if len(val_dataset) > 0:
+                    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+                else:
+                    print(f"Warning: No images found in validation directories {args.good_val_data_dir} or {args.defect_val_data_dir}. Skipping validation.")
+            except Exception as e:
+                print(f"Error creating validation dataset/dataloader: {e}. Skipping validation.")
+        else:
+            print("Validation data directories not specified, skipping validation.")
 
-    best_val_auc = -1.0  # Initialize best validation AUC
+        optimizer = optim.Adam(model.classifier.parameters(), lr=args.learning_rate)
+        criterion = nn.BCEWithLogitsLoss()
 
-    print(f"Starting training for {args.num_epochs} epochs...")
-    for epoch in range(args.num_epochs):
-        train_loss, train_acc = train_one_epoch(model, train_dataloader, criterion, optimizer, DEVICE)
-        print(f"Epoch {epoch+1}/{args.num_epochs} -> Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+        best_val_auc = -1.0  # Initialize best validation AUC
 
-        if val_dataloader:
-            val_loss, val_acc, val_auc = validate_one_epoch(model, val_dataloader, criterion, DEVICE)
-            print(f"Epoch {epoch+1}/{args.num_epochs} -> Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Val AUC: {val_auc:.4f}")
+        print(f"Starting training for {args.num_epochs} epochs...")
+        for epoch in range(args.num_epochs):
+            train_loss, train_acc = train_one_epoch(model, train_dataloader, criterion, optimizer, DEVICE)
+            print(f"Epoch {epoch+1}/{args.num_epochs} -> Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
-            if val_auc > best_val_auc:
-                best_val_auc = val_auc
-                print(f"New best validation AUC: {best_val_auc:.4f}. Saving model...")
-                best_model_save_path = os.path.join(args.output_dir, "clip_classifier_best_val_auc.pth")
-                os.makedirs(args.output_dir, exist_ok=True)
-                torch.save(model.state_dict(), best_model_save_path)
-                print(f"Saved best model checkpoint: {best_model_save_path}")
-    
-        if args.save_epoch_models:
-            model_save_path = os.path.join(args.output_dir, f"clip_classifier_epoch_{epoch+1}.pth")
-            os.makedirs(args.output_dir, exist_ok=True)
-            torch.save(model.state_dict(), model_save_path)
-            print(f"Saved model checkpoint: {model_save_path}")
+            if val_dataloader:
+                val_loss, val_acc, val_auc = validate_one_epoch(model, val_dataloader, criterion, DEVICE)
+                print(f"Epoch {epoch+1}/{args.num_epochs} -> Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Val AUC: {val_auc:.4f}")
 
-    print("Training finished.")
-    if args.save_final_model:
-        final_model_path = os.path.join(args.output_dir, "clip_binary_classifier_final.pth")
-        os.makedirs(args.output_dir, exist_ok=True)
-        torch.save(model.state_dict(), final_model_path)
-        print(f"Final model saved as {final_model_path}")
+                if val_auc > best_val_auc:
+                    best_val_auc = val_auc
+                    print(f"New best validation AUC: {best_val_auc:.4f}. Saving model...")
+                    best_model_save_path = os.path.join(run_output_dir, "clip_classifier_best_val_auc.pth") # Use run_output_dir
+                    # os.makedirs(run_output_dir, exist_ok=True) # Already created above
+                    torch.save(model.state_dict(), best_model_save_path)
+                    print(f"Saved best model checkpoint: {best_model_save_path}")
+        
+            if args.save_epoch_models:
+                model_save_path = os.path.join(run_output_dir, f"clip_classifier_epoch_{epoch+1}.pth") # Use run_output_dir
+                # os.makedirs(run_output_dir, exist_ok=True) # Already created above
+                torch.save(model.state_dict(), model_save_path)
+                print(f"Saved model checkpoint: {model_save_path}")
+
+        print("Training finished.")
+        if args.save_final_model:
+            final_model_path = os.path.join(run_output_dir, f"clip_binary_classifier_final_epoch_{args.num_epochs}.pth") # Use run_output_dir and add epoch number
+            # os.makedirs(run_output_dir, exist_ok=True) # Already created above
+            torch.save(model.state_dict(), final_model_path)
+            print(f"Final model saved as {final_model_path}")
+
+    finally:
+        # Restore stdout and close log file
+        sys.stdout = original_stdout
+        log_file.close()
+        print(f"Console output was logged to: {log_file_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train CLIP Binary Classifier")
@@ -193,10 +226,13 @@ if __name__ == "__main__":
     parser.add_argument('--good_val_data_dir', type=str, default=None, help='Directory for good validation images (optional)')
     parser.add_argument('--defect_val_data_dir', type=str, default=None, help='Directory for defect validation images (optional)')
 
-    parser.add_argument('--output_dir', type=str, default="./output_models", help='Directory to save model checkpoints and final model')
+    parser.add_argument('--output_dir', type=str, default="./results", help='Directory to save model checkpoints and final model')
     parser.add_argument('--save_epoch_models', action='store_true', help='Save model checkpoint after each epoch')
     parser.add_argument('--save_final_model', action='store_true', help='Save the final model after training')
     
+    parser.add_argument('--random_horizontal_flip', action='store_true', help='Apply random horizontal flip to training images')
+    parser.add_argument('--random_vertical_flip', action='store_true', help='Apply random vertical flip to training images')
+
     args = parser.parse_args()
     
     main(args)
