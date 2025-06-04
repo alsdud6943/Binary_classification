@@ -7,15 +7,16 @@ TEST_SCRIPT="${SCRIPT_DIR}/test.py"
 OUTPUT_DIR="${SCRIPT_DIR}/test_results_output"
 
 test_args=(
-  --model_path /home/hanta/minyeong/CLIPclassification/results/20250530_103027/clip_classifier_best_val_auc.pth # Example, replace with actual path
+  --model_path /home/hanta/minyeong/CLIPclassification/results/20250604_091744_128/clip_classifier_best_val_auc.pth # Example, replace with actual path
   
   # Pass multiple directories as separate arguments following a single --test_data_dir flag
-  --test_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/defect" "/mnt/d/minyeong/boundingbox/splitdataset/val/good"
+  --test_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/good" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/good" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족"
+                  "/mnt/d/minyeong/boundingbox/splitdataset/val/defect" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/defect" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족 defect"
   
   --model_name "openai/clip-vit-base-patch32"
-  --hidden_dim 16
+  --hidden_dim 128
 
-  --threshold 0.5
+  --threshold 0.4
   
   --output_dir "$OUTPUT_DIR"
 )

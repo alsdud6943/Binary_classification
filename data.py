@@ -17,11 +17,19 @@ class CLIPDataset(torch.utils.data.Dataset):
         # Store image paths and their corresponding labels
         self.image_data = []
         
-        good_image_paths = sorted(glob.glob(good_dir + "/*.jpg")) # Assuming .jpg, adjust if needed
+        good_image_paths = []
+        if isinstance(good_dir, str):
+            good_dir = [good_dir]
+        for directory in good_dir:
+            good_image_paths.extend(sorted(glob.glob(directory + "/*.jpg"))) # Assuming .jpg, adjust if needed
         for path in good_image_paths:
             self.image_data.append({"path": path, "label": 0}) # 0 for good
             
-        defect_image_paths = sorted(glob.glob(defect_dir + "/*.jpg")) # Assuming .jpg, adjust if needed
+        defect_image_paths = []
+        if isinstance(defect_dir, str):
+            defect_dir = [defect_dir]
+        for directory in defect_dir:
+            defect_image_paths.extend(sorted(glob.glob(directory + "/*.jpg"))) # Assuming .jpg, adjust if needed
         for path in defect_image_paths:
             self.image_data.append({"path": path, "label": 1}) # 1 for defect
 

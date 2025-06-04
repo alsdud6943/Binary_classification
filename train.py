@@ -12,6 +12,17 @@ import datetime
 import json # Import the json module
 import sys # Import sys for stdout redirection
 
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()  # Ensure immediate writing
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
 # Configuration values will be set by argparse
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -101,17 +112,20 @@ def main(args):
     run_output_dir = os.path.join(args.output_dir, current_time)
     os.makedirs(run_output_dir, exist_ok=True)
 
-    # Setup logging to file
+    # Setup logging to file and console
     log_file_path = os.path.join(run_output_dir, "training_log.txt")
     original_stdout = sys.stdout
-    log_file = open(log_file_path, 'w')
-    sys.stdout = log_file
+    log_file = None  # Initialize to None
 
     try:
+        log_file = open(log_file_path, 'w')
+        sys.stdout = Tee(original_stdout, log_file)  # Redirect stdout to Tee object
+
         print(f"Using device: {DEVICE}")
         print(f"Configuration: {args}")
         print(f"Saving models and logs to: {run_output_dir}")
-        print(f"Logging console output to: {log_file_path}")
+        # This message will now appear in the console as well.
+        print(f"All console output from this script is also being logged to: {log_file_path}")
 
 
         # Save the parsed arguments to a JSON file in the run_output_dir
@@ -205,8 +219,10 @@ def main(args):
 
     finally:
         # Restore stdout and close log file
-        sys.stdout = original_stdout
-        log_file.close()
+        sys.stdout = original_stdout  # Restore original stdout
+        if log_file:  # Check if log_file was successfully opened
+            log_file.close()
+        # This message will now only go to the terminal, confirming the log file location.
         print(f"Console output was logged to: {log_file_path}")
 
 if __name__ == "__main__":
@@ -220,11 +236,11 @@ if __name__ == "__main__":
     parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for DataLoader')
 
     # Made data directories required as dummy data creation is removed
-    parser.add_argument('--good_train_data_dir', type=str, required=True, help='Directory for good training images')
-    parser.add_argument('--defect_train_data_dir', type=str, required=True, help='Directory for defect training images')
+    parser.add_argument('--good_train_data_dir', type=str, nargs='+', required=True, help='Directory or directories for good training images')
+    parser.add_argument('--defect_train_data_dir', type=str, nargs='+', required=True, help='Directory or directories for defect training images')
     
-    parser.add_argument('--good_val_data_dir', type=str, default=None, help='Directory for good validation images (optional)')
-    parser.add_argument('--defect_val_data_dir', type=str, default=None, help='Directory for defect validation images (optional)')
+    parser.add_argument('--good_val_data_dir', type=str, nargs='+', default=None, help='Directory or directories for good validation images (optional)')
+    parser.add_argument('--defect_val_data_dir', type=str, nargs='+', default=None, help='Directory or directories for defect validation images (optional)')
 
     parser.add_argument('--output_dir', type=str, default="./results", help='Directory to save model checkpoints and final model')
     parser.add_argument('--save_epoch_models', action='store_true', help='Save model checkpoint after each epoch')
