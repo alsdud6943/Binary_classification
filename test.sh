@@ -17,7 +17,7 @@ test_args=(
   --model_name "openai/clip-vit-base-patch32"
   --hidden_dim 128
 
-  --threshold 0.4
+  --threshold 0.5
   
   --output_dir "$OUTPUT_DIR"
 )
