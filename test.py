@@ -61,7 +61,10 @@ def main(args):
         print(f"Saved test arguments to: {args_save_path}")
 
         print("Initializing model...")
-        model = CLIPBinaryClassifier(model_name=args.model_name, hidden_dim=args.hidden_dim).to(DEVICE)
+        model = CLIPBinaryClassifier(
+            model_name=args.model_name,
+            hidden_dim=args.hidden_dim,
+        ).to(DEVICE)
         
         if not os.path.exists(args.model_path):
             print(f"Error: Model path {args.model_path} does not exist.")
@@ -185,7 +188,7 @@ if __name__ == "__main__":
     
     # Model Configuration (should match the trained model)
     parser.add_argument('--model_name', type=str, default="openai/clip-vit-base-patch32", help='Name of the CLIP model (must match trained model)')
-    parser.add_argument('--hidden_dim', type=int, default=16, help='Hidden dimension for the classifier head (must match trained model)')
+    parser.add_argument('--hidden_dim', type=int, default=128, help='Hidden dimension for the classifier head (must match trained model)')
     parser.add_argument('--threshold', type=float, default=0.5, help='Threshold for classifying an image as defect')
 
     # Output directory

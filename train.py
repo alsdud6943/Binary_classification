@@ -135,7 +135,11 @@ def main(args):
         print(f"Saved training arguments to: {args_save_path}")
 
         print("Initializing model...")
-        model = CLIPBinaryClassifier(model_name=args.model_name, hidden_dim=args.hidden_dim).to(DEVICE)
+        model = CLIPBinaryClassifier(
+            model_name=args.model_name,
+            hidden_dim=args.hidden_dim,
+            use_linear_probing=args.use_linear_probing # Added use_linear_probing
+        ).to(DEVICE)
 
         print("Trainable parameters:")
         for name, param in model.named_parameters():
@@ -151,11 +155,15 @@ def main(args):
                 apply_horizontal_flip=args.random_horizontal_flip,  # Pass the new argument
                 apply_vertical_flip=args.random_vertical_flip      # Pass the new argument
             )
-            if len(train_dataset) == 0:
-                print(f"Error: No images found in training directories: {args.good_train_data_dir} or {args.defect_train_data_dir}. Please check the paths and ensure images exist.")
-                return # Exit if no images found
+            
+            # Display training dataset statistics
+            train_good_count, train_defect_count = train_dataset.get_label_counts()
+            print(f"Training dataset loaded: {train_good_count} good images, {train_defect_count} defect images (Total: {len(train_dataset)})")
 
             train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+        except ValueError as e:
+            print(f"Training dataset creation failed: {e}")
+            return
         except Exception as e:
             print(f"Error creating training dataset/dataloader: {e}")
             print(f"Please ensure the data directories ({args.good_train_data_dir}, {args.defect_train_data_dir}) exist with images, or provide valid data paths.")
@@ -173,17 +181,37 @@ def main(args):
                     apply_horizontal_flip=False, # Explicitly False for validation
                     apply_vertical_flip=False  # Explicitly False for validation
                 )
-                if len(val_dataset) > 0:
-                    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
-                else:
-                    print(f"Warning: No images found in validation directories {args.good_val_data_dir} or {args.defect_val_data_dir}. Skipping validation.")
+                
+                # Display validation dataset statistics
+                val_good_count, val_defect_count = val_dataset.get_label_counts()
+                print(f"Validation dataset loaded: {val_good_count} good images, {val_defect_count} defect images (Total: {len(val_dataset)})")
+                
+                val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+            except ValueError as e:
+                print(f"Validation dataset creation failed: {e}")
+                print("Continuing training without validation...")
             except Exception as e:
                 print(f"Error creating validation dataset/dataloader: {e}. Skipping validation.")
         else:
             print("Validation data directories not specified, skipping validation.")
 
         optimizer = optim.Adam(model.classifier.parameters(), lr=args.learning_rate)
-        criterion = nn.BCEWithLogitsLoss()
+        
+
+        
+        # # Calculate pos_weight for weighted BCE loss
+        # if train_defect_count > 0:
+        #     pos_weight_value = train_good_count / train_defect_count
+        #     print(f"Calculated pos_weight for BCEWithLogitsLoss: {pos_weight_value:.2f} (good_count={train_good_count} / defect_count={train_defect_count})")
+        # else:
+        #     pos_weight_value = 1.0 # Default if no defect samples, though this case should be handled by dataset loading
+        #     print("Warning: No defect samples found in training data. Using default pos_weight=1.0 for BCEWithLogitsLoss.")
+        
+        # pos_weight_tensor = torch.tensor([pos_weight_value], device=DEVICE)
+        # criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
+
+        criterion = nn.BCEWithLogitsLoss()  # Use default BCEWithLogitsLoss without pos_weight
+
 
         best_val_auc = -1.0  # Initialize best validation AUC
 
@@ -234,6 +262,7 @@ if __name__ == "__main__":
     parser.add_argument('--hidden_dim', type=int, default=128, help='Hidden dimension for the classifier head')
     parser.add_argument('--image_size', type=int, default=224, help='Image size for CLIP model input')
     parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for DataLoader')
+    parser.add_argument('--use_linear_probing', action='store_true', help='Use linear probing instead of MLP head for classification')
 
     # Made data directories required as dummy data creation is removed
     parser.add_argument('--good_train_data_dir', type=str, nargs='+', required=True, help='Directory or directories for good training images')

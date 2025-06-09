@@ -5,13 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRAIN_SCRIPT="${SCRIPT_DIR}/train.py"
 
 train_args=(
-  # training data
-  --good_train_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/train/good" "mnt/d/minyeong/boundingbox/cropped_5월_split/train/good" "mnt/d/minyeong/boundingbox/cropped_5월_split/train/joint 뾰족" 
-  --defect_train_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/train/defect" "mnt/d/minyeong/boundingbox/cropped_5월_split/train/defect" "mnt/d/minyeong/boundingbox/cropped_5월_split/train/joint 뾰족 defect" 
+  # training data 
+  --good_train_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/train/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/joint 뾰족" "/mnt/d/minyeong/boundingbox/splitdataset/train/뾰족"
+  --defect_train_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/train/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/joint 뾰족 defect" 
   
   # validation data
-  --good_val_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/good" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/good" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족" 
-  --defect_val_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/defect" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/defect" "mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족 defect" 
+  --good_val_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족" "/mnt/d/minyeong/boundingbox/splitdataset/val/뾰족"
+  --defect_val_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족 defect" 
 
   --random_horizontal_flip
   # --random_vertical_flip
@@ -20,12 +20,14 @@ train_args=(
   --learning_rate 0.0001
   --batch_size 32
   --num_epochs 100
+  # --model_name "openai/clip-vit-large-patch14"
   --model_name "openai/clip-vit-base-patch32"
   # --model_name "google/vit-base-patch16-224-in21k"
-  --hidden_dim 128
+  --hidden_dim 256
   --image_size 224
   --num_workers 8
-  
+  # --use_linear_probing
+
   # Output directory for models
   --output_dir "${SCRIPT_DIR}/results" # Saves models in 'results' relative to this script
 

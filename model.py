@@ -3,9 +3,10 @@ import torch.nn as nn
 from transformers import CLIPModel, ViTModel
 
 class CLIPBinaryClassifier(nn.Module):
-    def __init__(self, model_name="openai/clip-vit-base-patch32", hidden_dim=128, model_type="clip"): # Removed use_original_image_size_feature
+    def __init__(self, model_name="openai/clip-vit-base-patch32", hidden_dim=128, model_type="clip", use_linear_probing: bool = False):
         super(CLIPBinaryClassifier, self).__init__()
         self.model_type = model_type.lower()
+        self.use_linear_probing = use_linear_probing
 
         if self.model_type == "clip":
             self.vision_backbone = CLIPModel.from_pretrained(model_name)
@@ -23,15 +24,21 @@ class CLIPBinaryClassifier(nn.Module):
         else:
             raise ValueError(f"Unsupported model_type: {model_type}. Choose 'clip' or 'vit'.")
 
-        # Define the classifier head - always add 2 for original_image_size
-        classification_head_input_dim = vision_embedding_dim + 2 
-        
         self.hidden_dim = hidden_dim
-        self.classifier = nn.Sequential(
-            nn.Linear(classification_head_input_dim, hidden_dim),
-            nn.LeakyReLU(0.2),
-            nn.Linear(hidden_dim, 1) # 1 output for binary classification
-        )
+
+        if self.use_linear_probing:
+            classification_head_input_dim = vision_embedding_dim # Only vision embedding for linear probing
+            self.classifier = nn.Linear(classification_head_input_dim, 1) # 1 output for binary classification
+            print("Using Linear Probing head (vision embedding only).")
+        else:
+            # Define the classifier head - add 2 for original_image_size for MLP
+            classification_head_input_dim = vision_embedding_dim + 2 
+            self.classifier = nn.Sequential(
+                nn.Linear(classification_head_input_dim, hidden_dim),
+                nn.LeakyReLU(0.2),
+                nn.Linear(hidden_dim, 1) # 1 output for binary classification
+            )
+            print("Using MLP head (vision embedding + image size).")
 
     def forward(self, pixel_values, original_image_size): # original_image_size is now required
         """
@@ -43,7 +50,9 @@ class CLIPBinaryClassifier(nn.Module):
         """
         if self.model_type == "clip":
             # Get image features from the vision transformer part of CLIP
-            vision_outputs = self.vision_backbone.vision_model(pixel_values=pixel_values)
+            vision_outputs = self.vision_backbone.vision_model(
+                pixel_values=pixel_values
+            )
             cls_embedding = vision_outputs.pooler_output # CLS token embedding
         elif self.model_type == "vit":
             # Get image features from ViTModel
@@ -52,51 +61,52 @@ class CLIPBinaryClassifier(nn.Module):
         else: # Should not be reached if __init__ validation is correct
             raise ValueError(f"Unsupported model_type during forward pass: {self.model_type}")
 
-        # Always use original_image_size
-        if original_image_size is None: # Should not happen if called correctly
-            raise ValueError("original_image_size must be provided.")
+        if self.use_linear_probing:
+            combined_features = cls_embedding
+        else:
+            # Always use original_image_size for MLP head
+            if original_image_size is None: # Should not happen if called correctly
+                raise ValueError("original_image_size must be provided for MLP head.")
+                
+            # Ensure original_image_size is a float tensor and on the correct device
+            original_image_size_f = original_image_size.float().to(cls_embedding.device)
             
-        # Ensure original_image_size is a float tensor and on the correct device
-        original_image_size_f = original_image_size.float().to(cls_embedding.device)
-        
-        # Concatenate CLS embedding with original image size
-        combined_features = torch.cat((cls_embedding, original_image_size_f), dim=1)
+            # Concatenate CLS embedding with original image size
+            combined_features = torch.cat((cls_embedding, original_image_size_f), dim=1)
         
         # Pass combined features through the linear classifier
         logits = self.classifier(combined_features)
         return logits
-
-
-
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
     # Example usage (for testing the model structure)
     print("Testing CLIP model configuration:")
     try:
         # Example: Needs a dummy pixel_values and original_image_size to test forward pass
-        clip_model_test = CLIPBinaryClassifier(model_name="openai/clip-vit-base-patch32", hidden_dim=64, model_type="clip")
-        print("CLIPBinaryClassifier (type: clip) initialized.")
-        print(f"  Classifier head: {clip_model_test.classifier}")
-        # Dummy input for forward pass illustration (not run here)
-        # dummy_pixels = torch.randn(2, 3, 224, 224)
-        # dummy_sizes = torch.tensor([[224, 224], [300, 400]], dtype=torch.float) / 512.0 
-        # logits = clip_model_test(dummy_pixels, dummy_sizes)
-        # print(f"  Example logits shape: {logits.shape}")
+        print("\\n--- MLP Head (Default) ---")
+        clip_model_test_mlp = CLIPBinaryClassifier(model_name="openai/clip-vit-base-patch32", hidden_dim=64, model_type="clip", use_linear_probing=False)
+        print("CLIPBinaryClassifier (type: clip, MLP head) initialized.")
+        print(f"  Classifier head: {clip_model_test_mlp.classifier}")
+
+        print("\\n--- Linear Probing Head ---")
+        clip_model_test_linear = CLIPBinaryClassifier(model_name="openai/clip-vit-base-patch32", hidden_dim=64, model_type="clip", use_linear_probing=True)
+        print("CLIPBinaryClassifier (type: clip, Linear Probing head) initialized.")
+        print(f"  Classifier head: {clip_model_test_linear.classifier}")
+
     except Exception as e:
         print(f"Error initializing CLIP model: {e}")
 
     print("\\nTesting ViT model configuration:")
     try:
-        vit_model_test = CLIPBinaryClassifier(model_name="google/vit-base-patch16-224-in21k", hidden_dim=64, model_type="vit")
-        print("CLIPBinaryClassifier (type: vit) initialized.")
-        print(f"  Classifier head: {vit_model_test.classifier}")
+        print("\\n--- MLP Head (Default) ---")
+        vit_model_test_mlp = CLIPBinaryClassifier(model_name="google/vit-base-patch16-224-in21k", hidden_dim=64, model_type="vit")
+        print("CLIPBinaryClassifier (type: vit, MLP head) initialized.")
+        print(f"  Classifier head: {vit_model_test_mlp.classifier}")
+
+        print("\\n--- Linear Probing Head ---")
+        vit_model_test_linear = CLIPBinaryClassifier(model_name="google/vit-base-patch16-224-in21k", hidden_dim=64, model_type="vit", use_linear_probing=True)
+        print("CLIPBinaryClassifier (type: vit, Linear Probing head) initialized.")
+        print(f"  Classifier head: {vit_model_test_linear.classifier}")
     except Exception as e:
         print(f"Error initializing ViT model: {e}")
 

@@ -20,21 +20,38 @@ class CLIPDataset(torch.utils.data.Dataset):
         good_image_paths = []
         if isinstance(good_dir, str):
             good_dir = [good_dir]
+        
+        # Check each good directory individually
+        error_messages = []
         for directory in good_dir:
-            good_image_paths.extend(sorted(glob.glob(directory + "/*.jpg"))) # Assuming .jpg, adjust if needed
-        for path in good_image_paths:
-            self.image_data.append({"path": path, "label": 0}) # 0 for good
-            
+            dir_images = sorted(glob.glob(directory + "/*.jpg"))
+            if not dir_images:
+                error_messages.append(f"No images found in good directory: {directory}")
+            else:
+                good_image_paths.extend(dir_images)
+        
         defect_image_paths = []
         if isinstance(defect_dir, str):
             defect_dir = [defect_dir]
+        
+        # Check each defect directory individually
         for directory in defect_dir:
-            defect_image_paths.extend(sorted(glob.glob(directory + "/*.jpg"))) # Assuming .jpg, adjust if needed
+            dir_images = sorted(glob.glob(directory + "/*.jpg"))
+            if not dir_images:
+                error_messages.append(f"No images found in defect directory: {directory}")
+            else:
+                defect_image_paths.extend(dir_images)
+        
+        if error_messages:
+            for msg in error_messages:
+                print(f"Error: {msg}")
+            raise ValueError("Dataset creation failed: Missing images in required directories")
+        
+        # Add images to dataset
+        for path in good_image_paths:
+            self.image_data.append({"path": path, "label": 0}) # 0 for good
         for path in defect_image_paths:
             self.image_data.append({"path": path, "label": 1}) # 1 for defect
-
-        if not self.image_data:
-            print(f"Warning: No images found in {good_dir} or {defect_dir}. The dataset will be empty.")
         
         # Initialize CLIP processor
         self.processor = CLIPProcessor.from_pretrained(clip_model_name)
@@ -94,6 +111,12 @@ class CLIPDataset(torch.utils.data.Dataset):
             "label": torch.tensor(label, dtype=torch.float), 
             "original_image_size": original_image_size_tensor # Return normalized tensor
         }
+
+    def get_label_counts(self):
+        """Return the count of good (label=0) and defect (label=1) images."""
+        good_count = sum(1 for item in self.image_data if item["label"] == 0)
+        defect_count = sum(1 for item in self.image_data if item["label"] == 1)
+        return good_count, defect_count
 
     def __len__(self):
         return len(self.image_data)

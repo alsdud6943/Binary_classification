@@ -1,4 +1,4 @@
-transformers
+transformers #얘만 glass_env에다가 추가로 있으면 되는듯?
 torch
 pillow
 scikit-learn
