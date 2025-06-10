@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import CLIPProcessor # Import CLIPProcessor
+from torch.utils.data import DataLoader # Added
 from PIL import Image # Import PIL for image loading
 import shutil # Import shutil for file copying
 import argparse
@@ -10,6 +10,7 @@ import datetime
 import sys
 
 from model import CLIPBinaryClassifier
+from data_keepratio import CLIPDataset # Added
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -62,8 +63,10 @@ def main(args):
 
         print("Initializing model...")
         model = CLIPBinaryClassifier(
+            model_type=args.model_type,
             model_name=args.model_name,
             hidden_dim=args.hidden_dim,
+            use_linear_probing=args.use_linear_probing
         ).to(DEVICE)
         
         if not os.path.exists(args.model_path):
@@ -77,79 +80,71 @@ def main(args):
         model.eval() # Set model to evaluation mode
         print("Model loaded successfully.")
 
-        print(f"Loading CLIP processor for model: {args.model_name}...")
-        processor = CLIPProcessor.from_pretrained(args.model_name)
-        print("CLIP processor loaded successfully.")
+        print("Initializing test dataset and dataloader...")
+        try:
+            test_dataset = CLIPDataset(
+                good_dir=args.test_data_dir, # Use test_data_dir as good_dir
+                defect_dir=[], # No defect directory for test set
+                model_type=args.model_type,
+                model_name=args.model_name,
+                patch_size=args.patch_size,
+                apply_horizontal_flip=False,
+                apply_vertical_flip=False
+            )
+            test_dataloader = DataLoader(
+                test_dataset,
+                batch_size=args.batch_size,
+                shuffle=False,
+                num_workers=args.num_workers,
+                pin_memory=True
+            )
+            print(f"Test dataset loaded: {len(test_dataset)} images.")
+        except Exception as e:
+            print(f"Error creating test dataset/dataloader: {e}")
+            tee_logger.close()
+            sys.stdout = original_stdout
+            return
 
+        total_images_processed_count = len(test_dataset)
         total_good_count = 0
         total_defect_count = 0
-        total_images_processed_count = 0
-
-        for data_dir in args.test_data_dir:
-            print(f"\nProcessing images from directory: {data_dir}")
-            if not os.path.isdir(data_dir):
-                print(f"Warning: Directory {data_dir} does not exist. Skipping.")
-                continue
-
-            image_files = [f for f in os.listdir(data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
-            
-            if not image_files:
-                print(f"No image files found in {data_dir}.")
-                continue
-            
-            total_images_processed_count += len(image_files)
-            current_dir_good_count = 0
-            current_dir_defect_count = 0
-
-            with torch.no_grad():
-                for image_name in image_files:
-                    image_path = os.path.join(data_dir, image_name)
-                    try:
-                        image = Image.open(image_path).convert("RGB")
-                        original_size = image.size
-
-                        # Preprocess image
-                        inputs = processor(text=None, images=image, return_tensors="pt", padding=True)
-                        pixel_values = inputs["pixel_values"].to(DEVICE)
-                        
-                        # Create original_image_size tensor for the model
-                        # Apply the same normalization as in data.py
-                        # Scaling width by 512 and height by 699.
-                        original_size_normalized_tensor = torch.tensor(
-                            [original_size[0] / 512.0, original_size[1] / 699.0],
-                            dtype=torch.float
-                        ).unsqueeze(0).to(DEVICE)
-
-                        # Get prediction
-                        logits = model(pixel_values, original_size_normalized_tensor) # Use normalized tensor
-                        print(f"Debug: Logits for {image_name} from {data_dir}: {logits.item()}") # Print raw logits
-                        prob = torch.sigmoid(logits).item() # Get probability for the positive class (defect)
-
-                        destination_folder = ""
-                        classification_label = ""
-
-                        if prob > args.threshold: # Predicted as defect using the provided threshold
-                            destination_folder = defect_images_output_dir
-                            classification_label = "Defect"
-                            current_dir_defect_count += 1
-                        else: # Predicted as good
-                            destination_folder = good_images_output_dir
-                            classification_label = "Good"
-                            current_dir_good_count += 1
-                        
-                        shutil.copy(image_path, os.path.join(destination_folder, image_name))
-                        print(f"Processed '{image_name}' from '{data_dir}': Classified as {classification_label} (Prob: {prob:.4f}) -> Copied to {destination_folder}")
-
-                    except Exception as e:
-                        print(f"Error processing image {image_name} from {data_dir}: {e}")
-            
-            print(f"Summary for directory {data_dir}:")
-            print(f"  Images classified as Good: {current_dir_good_count}")
-            print(f"  Images classified as Defect: {current_dir_defect_count}")
-            total_good_count += current_dir_good_count
-            total_defect_count += current_dir_defect_count
         
-        print("\nOverall Classification Summary:")
+        print(f"\\nProcessing {total_images_processed_count} images from specified directories...")
+
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(test_dataloader):
+                pixel_values = batch["pixel_values"].to(DEVICE)
+                original_image_size = batch["original_image_size"].to(DEVICE)
+                image_paths = batch["image_path"] # List of image paths in the batch
+
+                # Get prediction
+                logits = model(pixel_values, original_image_size)
+                probs = torch.sigmoid(logits) # Shape: [batch_size, 1] or [batch_size]
+
+                for i in range(len(image_paths)):
+                    image_path = image_paths[i]
+                    image_name = os.path.basename(image_path)
+                    prob_item = probs[i].item() # Get individual probability
+
+                    destination_folder = ""
+                    classification_label = ""
+
+                    if prob_item > args.threshold: # Predicted as defect
+                        destination_folder = defect_images_output_dir
+                        classification_label = "Defect"
+                        total_defect_count += 1
+                    else: # Predicted as good
+                        destination_folder = good_images_output_dir
+                        classification_label = "Good"
+                        total_good_count += 1
+                    
+                    try:
+                        shutil.copy(image_path, os.path.join(destination_folder, image_name))
+                        print(f"Processed '{image_name}' (from path: {image_path}): Classified as {classification_label} (Prob: {prob_item:.4f}) -> Copied to {destination_folder}")
+                    except Exception as e:
+                        print(f"Error copying image {image_name} to {destination_folder}: {e}")
+        
+        print("\\nOverall Classification Summary:")
         print(f"  Total images processed: {total_images_processed_count}")
         print(f"  Total images classified as Good: {total_good_count}")
         print(f"  Total images classified as Defect: {total_defect_count}")
@@ -187,9 +182,19 @@ if __name__ == "__main__":
     parser.add_argument('--test_data_dir', type=str, nargs='+', required=True, help='One or more directories for test images to classify')
     
     # Model Configuration (should match the trained model)
+    parser.add_argument('--model_type', type=str, default="clip", choices=["clip", "vit", "dinov2"], help='Type of model used for training: clip, vit, or dinov2')
     parser.add_argument('--model_name', type=str, default="openai/clip-vit-base-patch32", help='Name of the CLIP model (must match trained model)')
     parser.add_argument('--hidden_dim', type=int, default=128, help='Hidden dimension for the classifier head (must match trained model)')
+    parser.add_argument('--use_linear_probing', action='store_true', help='Whether linear probing was used (must match trained model)')
+    parser.add_argument('--patch_size', type=int, default=32, help='Patch size used during training (crucial for preprocessing)')
+
+    parser.add_argument('--image_size', type=int, default=224, help='Image size reference for the processor (e.g., 224, must match training processor config)')
+
     parser.add_argument('--threshold', type=float, default=0.5, help='Threshold for classifying an image as defect')
+
+    # Batching and workers
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for testing')
+    parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for DataLoader')
 
     # Output directory
     parser.add_argument('--output_dir', type=str, default="./test_results", help='Directory to save test logs, classified images, and results')

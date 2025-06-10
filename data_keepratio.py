@@ -69,14 +69,27 @@ class CLIPDataset(torch.utils.data.Dataset):
         self.apply_horizontal_flip = apply_horizontal_flip
         self.apply_vertical_flip = apply_vertical_flip
 
-        # Configure the image_processor to resize to 224x224 and disable center cropping
-        # This assumes the loaded processor has an 'image_processor' attribute that can be configured this way.
+        # Configure the image_processor
         if hasattr(self.processor, 'image_processor') and self.processor.image_processor is not None:
-            self.processor.image_processor.do_resize = True # Processor will resize after our custom crop
-            self.processor.image_processor.size = {"height": 224, "width": 224} # Consistent 224x224 resize
-            self.processor.image_processor.do_center_crop = False # We do a custom top-left crop
-            # The resample filter (e.g., BICUBIC) is usually a default in CLIPImageProcessor.
-            print(f"Configured image_processor for {self.model_type}: custom crop to multiple of patch_size {self.patch_size}, then resize to 224x224, no center crop.")
+            # Prevent the processor from doing its standard resize to a fixed dimension.
+            # The image passed to it will already be cropped to a multiple of patch_size.
+            self.processor.image_processor.do_resize = False
+            self.processor.image_processor.do_center_crop = False # We perform a custom top-left crop
+
+            # Ensure 'size' is present, as it might be used for positional embedding interpolation, 
+            # even if do_resize is False. Common ViT models expect a reference size like 224x224.
+            if not hasattr(self.processor.image_processor, 'size') or \
+               self.processor.image_processor.size is None or \
+               (isinstance(self.processor.image_processor.size, dict) and not self.processor.image_processor.size):
+                # Set a default typical size if not adequately defined. This might vary based on model.
+                # For many ViT/CLIP models, this is {'height': 224, 'width': 224} or {'shortest_edge': 224}
+                self.processor.image_processor.size = {"height": 224, "width": 224}
+                print(f"Set default image_processor.size to {self.processor.image_processor.size} as it was missing/empty.")
+            
+            print(f"Configured image_processor for {self.model_type}: "
+                  f"Images will be cropped to multiple of patch_size {self.patch_size}. "
+                  f"Processor\'s internal resize is DISABLED. Model will receive variable-sized inputs. "
+                  f"Processor\'s reference size for potential PE interpolation: {self.processor.image_processor.size}.")
         else:
             print(f"Warning: Processor for {self.model_type} does not have a standard 'image_processor' attribute or it's None. Preprocessing settings (resize, crop) might not be applied as expected.")
 
@@ -97,32 +110,31 @@ class CLIPDataset(torch.utils.data.Dataset):
 
             original_width, original_height = image.size
             
+            # Calculate dimensions for cropping to multiples of patch_size
+            crop_w = (original_width // self.patch_size) * self.patch_size
+            crop_h = (original_height // self.patch_size) * self.patch_size
 
-
-
-
-            # # Calculate dimensions for cropping to multiples of patch_size
-            # crop_w = (original_width // self.patch_size) * self.patch_size
-            # crop_h = (original_height // self.patch_size) * self.patch_size
-
-            # if crop_w <= 0 or crop_h <= 0:
-            #     raise ValueError(
-            #         f"Image {image_path} (original size: {original_width}x{original_height}) "
-            #         f"is too small to be cropped to a non-zero multiple of patch size {self.patch_size}. "
-            #         f"Resulting crop dimensions would be {crop_w}x{crop_h}."
-            #     )
+            if crop_w <= 0 or crop_h <= 0:
+                raise ValueError(
+                    f"Image {image_path} (original size: {original_width}x{original_height}) "
+                    f"is too small to be cropped to a non-zero multiple of patch size {self.patch_size}. "
+                    f"Resulting crop dimensions would be {crop_w}x{crop_h}."
+                )
             
-            # image = image.crop((0, 0, crop_w, crop_h))
-            # # original_size_tuple = image.size # This is now (crop_w, crop_h)
+            # Calculate top-left corner for center cropping
+            left = (original_width - crop_w) // 2
+            top = (original_height - crop_h) // 2
+            right = left + crop_w
+            bottom = top + crop_h
             
-
-
-
+            image = image.crop((left, top, right, bottom))
+            # original_size_tuple = image.size # This is now (crop_w, crop_h)
+            
 
             # Convert original_image_size to a normalized FloatTensor using cropped dimensions
             # Scaling width by 512 and height by 699.
             original_image_size_tensor = torch.tensor(
-                [original_width / 512.0, original_height / 699.0], # Use cropped dimensions
+                [crop_w / 512.0, crop_h / 699.0], # Use cropped dimensions
                 dtype=torch.float
             )
             

@@ -20,13 +20,16 @@ train_args=(
   --learning_rate 0.0001
   --batch_size 32
   --num_epochs 100
+  --model_type "dinov2"
   # --model_name "openai/clip-vit-large-patch14"
-  --model_name "openai/clip-vit-base-patch32"
+  # --model_name "openai/clip-vit-base-patch32"
+  --model_name "facebook/dinov2-base"
   # --model_name "google/vit-base-patch16-224-in21k"
   --hidden_dim 256
   --image_size 224
   --num_workers 8
   # --use_linear_probing
+  --patch_size 14
 
   # Output directory for models
   --output_dir "${SCRIPT_DIR}/results" # Saves models in 'results' relative to this script

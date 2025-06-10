@@ -3,7 +3,10 @@ import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from model import CLIPBinaryClassifier
-from data import CLIPDataset
+
+# from data import CLIPDataset
+from data_keepratio import CLIPDataset
+
 import argparse # Import argparse
 import os # Import os for path operations
 from sklearn.metrics import roc_auc_score # Import for AUC
@@ -136,6 +139,7 @@ def main(args):
 
         print("Initializing model...")
         model = CLIPBinaryClassifier(
+            model_type=args.model_type,
             model_name=args.model_name,
             hidden_dim=args.hidden_dim,
             use_linear_probing=args.use_linear_probing # Added use_linear_probing
@@ -151,7 +155,9 @@ def main(args):
             train_dataset = CLIPDataset(
                 good_dir=args.good_train_data_dir, 
                 defect_dir=args.defect_train_data_dir, 
-                clip_model_name=args.model_name,
+                model_type=args.model_type,
+                model_name=args.model_name,
+                patch_size=args.patch_size, 
                 apply_horizontal_flip=args.random_horizontal_flip,  # Pass the new argument
                 apply_vertical_flip=args.random_vertical_flip      # Pass the new argument
             )
@@ -177,7 +183,9 @@ def main(args):
                 val_dataset = CLIPDataset(
                     good_dir=args.good_val_data_dir,
                     defect_dir=args.defect_val_data_dir,
-                    clip_model_name=args.model_name,
+                    model_type=args.model_type, # Added model_type
+                    model_name=args.model_name, # Changed from clip_model_name
+                    patch_size=args.patch_size, # Added patch_size
                     apply_horizontal_flip=False, # Explicitly False for validation
                     apply_vertical_flip=False  # Explicitly False for validation
                 )
@@ -258,11 +266,13 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='Learning rate for the optimizer')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training and validation')
     parser.add_argument('--num_epochs', type=int, default=100, help='Number of training epochs')
+    parser.add_argument('--model_type', type=str, default="clip", choices=["clip", "vit", "dinov2"], help='Type of model to use: clip, vit, or dinov2')
     parser.add_argument('--model_name', type=str, default="openai/clip-vit-base-patch32", help='Name of the CLIP model to use')
     parser.add_argument('--hidden_dim', type=int, default=128, help='Hidden dimension for the classifier head')
     parser.add_argument('--image_size', type=int, default=224, help='Image size for CLIP model input')
     parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for DataLoader')
     parser.add_argument('--use_linear_probing', action='store_true', help='Use linear probing instead of MLP head for classification')
+    parser.add_argument('--patch_size', type=int, help='Patch size for ViT/DINOv2 models')
 
     # Made data directories required as dummy data creation is removed
     parser.add_argument('--good_train_data_dir', type=str, nargs='+', required=True, help='Directory or directories for good training images')
