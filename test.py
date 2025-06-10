@@ -129,6 +129,12 @@ def main(args):
                     destination_folder = ""
                     classification_label = ""
 
+                    # Prepare filename with probability
+                    name_part, ext_part = os.path.splitext(image_name)
+                    # Format probability to two decimal places, replacing dot with underscore for filename
+                    prob_formatted_for_filename = f"{prob_item:.2f}".replace(".", "_") 
+                    new_image_name = f"{name_part}_{prob_formatted_for_filename}{ext_part}"
+
                     if prob_item > args.threshold: # Predicted as defect
                         destination_folder = defect_images_output_dir
                         classification_label = "Defect"
@@ -139,12 +145,12 @@ def main(args):
                         total_good_count += 1
                     
                     try:
-                        shutil.copy(image_path, os.path.join(destination_folder, image_name))
-                        print(f"Processed '{image_name}' (from path: {image_path}): Classified as {classification_label} (Prob: {prob_item:.4f}) -> Copied to {destination_folder}")
+                        shutil.copy(image_path, os.path.join(destination_folder, new_image_name)) # Use new_image_name
+                        print(f"Processed '{image_name}' (from path: {image_path}): Classified as {classification_label} (Prob: {prob_item:.4f}) -> Copied to {os.path.join(destination_folder, new_image_name)}")
                     except Exception as e:
-                        print(f"Error copying image {image_name} to {destination_folder}: {e}")
+                        print(f"Error copying image {image_name} to {os.path.join(destination_folder, new_image_name)}: {e}")
         
-        print("\\nOverall Classification Summary:")
+        print("\\\\nOverall Classification Summary:")
         print(f"  Total images processed: {total_images_processed_count}")
         print(f"  Total images classified as Good: {total_good_count}")
         print(f"  Total images classified as Defect: {total_defect_count}")
