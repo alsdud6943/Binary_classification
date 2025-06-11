@@ -21,9 +21,11 @@ train_args=(
   --batch_size 32
   --num_epochs 100
   --model_type "dinov2"
-  # --model_name "openai/clip-vit-large-patch14"
-  # --model_name "openai/clip-vit-base-patch32"
-  --model_name "facebook/dinov2-base"
+  # --model_type "vit"
+
+
+  # --model_name "facebook/dinov2-base"
+  --model_name "facebook/dinov2-large"
   # --model_name "google/vit-base-patch16-224-in21k"
   --hidden_dim 256
   --image_size 224
