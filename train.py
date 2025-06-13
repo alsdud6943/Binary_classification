@@ -215,10 +215,10 @@ def main(args):
         #     pos_weight_value = 1.0 # Default if no defect samples, though this case should be handled by dataset loading
         #     print("Warning: No defect samples found in training data. Using default pos_weight=1.0 for BCEWithLogitsLoss.")
         
-        # pos_weight_tensor = torch.tensor([pos_weight_value], device=DEVICE)
-        # criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
+        pos_weight_tensor = torch.tensor([2], device=DEVICE)
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
 
-        criterion = nn.BCEWithLogitsLoss()  # Use default BCEWithLogitsLoss without pos_weight
+        # criterion = nn.BCEWithLogitsLoss()  # Use default BCEWithLogitsLoss without pos_weight
 
 
         best_val_auc = -1.0  # Initialize best validation AUC

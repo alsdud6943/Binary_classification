@@ -7,7 +7,7 @@ TEST_SCRIPT="${SCRIPT_DIR}/test.py"
 OUTPUT_DIR="${SCRIPT_DIR}/test_results_output"
 
 test_args=(
-  --model_path /home/hanta/minyeong/CLIPclassification/results/20250611_110749_dinolarge_128/clip_classifier_best_val_auc.pth
+  --model_path /home/hanta/minyeong/CLIPclassification/results/20250612_082741_dinolarge_256_defectweight2/clip_classifier_best_val_auc.pth
   
   # Pass multiple directories as separate arguments following a single --test_data_dir flag
   # --test_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족"
@@ -17,7 +17,7 @@ test_args=(
   --model_type "dinov2"  
   # --model_name "openai/clip-vit-base-patch32"
   --model_name "facebook/dinov2-large"
-  --hidden_dim 128
+  --hidden_dim 256
   --patch_size 14
   --threshold 0.8
   

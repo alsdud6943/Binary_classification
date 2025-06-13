@@ -17,7 +17,7 @@ train_args=(
   # --random_vertical_flip
 
   # Training parameters
-  --learning_rate 0.0001
+  --learning_rate 0.00008
   --batch_size 32
   --num_epochs 100
   --model_type "dinov2"
