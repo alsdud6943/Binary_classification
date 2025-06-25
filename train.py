@@ -110,6 +110,7 @@ def validate_one_epoch(model, dataloader, criterion, device):
     return epoch_loss, epoch_acc, epoch_auc
 
 def main(args):
+    start_epoch = 0 # Initialize start_epoch
     # Generate a unique run ID based on the current timestamp
     current_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     run_output_dir = os.path.join(args.output_dir, current_time)
@@ -130,7 +131,6 @@ def main(args):
         # This message will now appear in the console as well.
         print(f"All console output from this script is also being logged to: {log_file_path}")
 
-
         # Save the parsed arguments to a JSON file in the run_output_dir
         args_save_path = os.path.join(run_output_dir, "training_args.json")
         with open(args_save_path, 'w') as f:
@@ -144,6 +144,17 @@ def main(args):
             hidden_dim=args.hidden_dim,
             use_linear_probing=args.use_linear_probing # Added use_linear_probing
         ).to(DEVICE)
+
+########################## training from checkpoint
+        if args.checkpoint_path:
+            if os.path.exists(args.checkpoint_path):
+                print(f"Loading checkpoint from: {args.checkpoint_path}")
+                checkpoint = torch.load(args.checkpoint_path, map_location=DEVICE)
+                model.load_state_dict(checkpoint)
+                print("Checkpoint loaded successfully.")
+            else:
+                print(f"Warning: Checkpoint path {args.checkpoint_path} does not exist. Starting training from scratch.")
+###########################
 
         print("Trainable parameters:")
         for name, param in model.named_parameters():
@@ -215,16 +226,16 @@ def main(args):
         #     pos_weight_value = 1.0 # Default if no defect samples, though this case should be handled by dataset loading
         #     print("Warning: No defect samples found in training data. Using default pos_weight=1.0 for BCEWithLogitsLoss.")
         
-        pos_weight_tensor = torch.tensor([2], device=DEVICE)
-        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
+        # pos_weight_tensor = torch.tensor([2], device=DEVICE)
+        # criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
 
-        # criterion = nn.BCEWithLogitsLoss()  # Use default BCEWithLogitsLoss without pos_weight
+        criterion = nn.BCEWithLogitsLoss()  # Use default BCEWithLogitsLoss without pos_weight
 
 
         best_val_auc = -1.0  # Initialize best validation AUC
 
         print(f"Starting training for {args.num_epochs} epochs...")
-        for epoch in range(args.num_epochs):
+        for epoch in range(start_epoch, args.num_epochs): # Modified to use start_epoch
             train_loss, train_acc = train_one_epoch(model, train_dataloader, criterion, optimizer, DEVICE)
             print(f"Epoch {epoch+1}/{args.num_epochs} -> Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
 
@@ -287,7 +298,7 @@ if __name__ == "__main__":
     
     parser.add_argument('--random_horizontal_flip', action='store_true', help='Apply random horizontal flip to training images')
     parser.add_argument('--random_vertical_flip', action='store_true', help='Apply random vertical flip to training images')
-
+    parser.add_argument('--checkpoint_path', type=str, default=None, help='Path to a checkpoint to resume training from (optional)')
     args = parser.parse_args()
     
     main(args)

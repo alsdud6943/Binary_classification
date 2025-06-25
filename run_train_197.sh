@@ -17,9 +17,9 @@ train_args=(
   # --random_vertical_flip
 
   # Training parameters
-  --learning_rate 0.00008
+  --learning_rate 0.0001
   --batch_size 32
-  --num_epochs 100
+  --num_epochs 200
   --model_type "dinov2"
   # --model_type "vit"
 
@@ -32,6 +32,8 @@ train_args=(
   --num_workers 8
   # --use_linear_probing
   --patch_size 14
+
+  --checkpoint_path "/home/hanta/minyeong/CLIPclassification/results/20250611_135517_dinolarge_256/clip_binary_classifier_final_epoch_100.pth"
 
   # Output directory for models
   --output_dir "${SCRIPT_DIR}/results" # Saves models in 'results' relative to this script

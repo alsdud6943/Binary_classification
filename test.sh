@@ -7,16 +7,17 @@ TEST_SCRIPT="${SCRIPT_DIR}/test.py"
 OUTPUT_DIR="${SCRIPT_DIR}/test_results_output"
 
 test_args=(
-  --model_path /home/hanta/minyeong/CLIPclassification/results/20250610_085608_dino256_keepaspectratio/clip_classifier_best_val_auc.pth
+  --model_path /home/hanta/minyeong/CLIPclassification/results/20250611_135517_dinolarge_256/clip_classifier_best_val_auc.pth
   
   # Pass multiple directories as separate arguments following a single --test_data_dir flag
   # --test_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족"
   #                 "/mnt/d/minyeong/boundingbox/splitdataset/val/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족 defect"
-  --test_data_dir /mnt/d/minyeong/2025-06-10_10-56-23/cropped
+  --test_data_dir /mnt/d/minyeong/2025-06-10_10-56-23_gt_defect_end0_9만장정도_돌린것/cropped
 
   --model_type "dinov2"  
   # --model_name "openai/clip-vit-base-patch32"
-  --model_name "facebook/dinov2-base"
+  --model_name "facebook/dinov2-large"
+  # --model_name "facebook/dinov2-base"
   --hidden_dim 256
   --patch_size 14
   --threshold 0.8
