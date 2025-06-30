@@ -7,7 +7,9 @@ TRAIN_SCRIPT="${SCRIPT_DIR}/train.py"
 train_args=(
   # training data 
   --good_train_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/train/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/joint 뾰족" "/mnt/d/minyeong/boundingbox/splitdataset/train/뾰족"
+  "/mnt/d/minyeong/2025-06-10_10-56-23_gt_defect_end0_9만장정도_돌린것/split/good"
   --defect_train_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/train/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/train/joint 뾰족 defect" 
+  "/mnt/d/minyeong/2025-06-10_10-56-23_gt_defect_end0_9만장정도_돌린것/split/defect"
   
   # validation data
   --good_val_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족" "/mnt/d/minyeong/boundingbox/splitdataset/val/뾰족"

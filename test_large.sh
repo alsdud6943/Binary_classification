@@ -12,7 +12,9 @@ test_args=(
   # Pass multiple directories as separate arguments following a single --test_data_dir flag
   # --test_data_dir "/mnt/d/minyeong/boundingbox/splitdataset/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/good" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족"
   #                 "/mnt/d/minyeong/boundingbox/splitdataset/val/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/defect" "/mnt/d/minyeong/boundingbox/cropped_5월_split/val/joint 뾰족 defect"
-  --test_data_dir /mnt/d/minyeong/2025-06-10_10-56-23/cropped
+
+  # --test_data_dir /mnt/d/minyeong/2025-06-10_10-56-23/cropped
+  --test_data_dir /mnt/d/minyeong/GLASS_testresults_all/2025-06-25_10-42-40_250616-250622_수작업으로고른것/cropped
 
   --model_type "dinov2"  
   # --model_name "openai/clip-vit-base-patch32"
