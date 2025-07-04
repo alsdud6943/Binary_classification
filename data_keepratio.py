@@ -11,6 +11,25 @@ import random # Import the random module
 IMAGENET_MEAN = [0.485, 0.456, 0.406] # Standard ImageNet mean
 IMAGENET_STD = [0.229, 0.224, 0.225]  # Standard ImageNet std
 
+def custom_collate_fn(batch):
+    """
+    Custom collate function to handle variable-sized images.
+    Returns a list of tensors instead of stacking them.
+    """
+    pixel_values = [item["pixel_values"] for item in batch]
+    image_paths = [item["image_path"] for item in batch]
+    labels = torch.stack([item["label"] for item in batch])
+    original_image_sizes = torch.stack([item["original_image_size"] for item in batch])
+    
+    return {
+        "pixel_values": pixel_values,  # List of tensors with different shapes
+        "image_path": image_paths,
+        "label": labels,
+        "original_image_size": original_image_sizes
+    }
+
+##############################################################
+
 class CLIPDataset(torch.utils.data.Dataset):
     def __init__(self, good_dir, defect_dir, model_type, model_name, patch_size: int, apply_horizontal_flip=False, apply_vertical_flip=False): # Added patch_size
         super().__init__()
@@ -75,6 +94,7 @@ class CLIPDataset(torch.utils.data.Dataset):
             # The image passed to it will already be cropped to a multiple of patch_size.
             self.processor.image_processor.do_resize = False
             self.processor.image_processor.do_center_crop = False # We perform a custom top-left crop
+            self.processor.image_processor.do_rescale = False # Explicitly disable rescaling
 
             # Ensure 'size' is present, as it might be used for positional embedding interpolation, 
             # even if do_resize is False. Common ViT models expect a reference size like 224x224.
@@ -140,8 +160,10 @@ class CLIPDataset(torch.utils.data.Dataset):
             
             # Process image using CLIPProcessor
             # The processor handles resizing, cropping (usually center crop), normalization, and tensor conversion.
-            processed_inputs = self.processor(images=image, return_tensors="pt")
+            # Explicitly disable resize and crop at call time as a safeguard.
+            processed_inputs = self.processor(images=image, return_tensors="pt", do_resize=False, do_center_crop=False, do_rescale=False)
             pixel_values = processed_inputs['pixel_values'].squeeze(0) # Remove batch dim
+            # print(f"shape of pixel_values: {pixel_values.shape}") # Should now show variable sizes
 
         except PIL.UnidentifiedImageError:
             print(f"Warning: Could not open image {image_path}. Skipping.")

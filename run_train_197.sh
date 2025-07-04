@@ -20,14 +20,14 @@ train_args=(
 
   # Training parameters
   --learning_rate 0.0001
-  --batch_size 32
-  --num_epochs 200
+  --batch_size 1
+  --num_epochs 100
   --model_type "dinov2"
   # --model_type "vit"
 
 
-  # --model_name "facebook/dinov2-base"
-  --model_name "facebook/dinov2-large"
+  --model_name "facebook/dinov2-base"
+  # --model_name "facebook/dinov2-large"
   # --model_name "google/vit-base-patch16-224-in21k"
   --hidden_dim 256
   --image_size 224
@@ -35,7 +35,7 @@ train_args=(
   # --use_linear_probing
   --patch_size 14
 
-  --checkpoint_path "/home/hanta/minyeong/CLIPclassification/results/20250611_135517_dinolarge_256/clip_binary_classifier_final_epoch_100.pth"
+  # --checkpoint_path "/home/hanta/minyeong/CLIPclassification/results/20250611_135517_dinolarge_256/clip_binary_classifier_final_epoch_100.pth"
 
   # Output directory for models
   --output_dir "${SCRIPT_DIR}/results" # Saves models in 'results' relative to this script
