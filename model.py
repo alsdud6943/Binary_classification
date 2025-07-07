@@ -4,7 +4,7 @@ from transformers import CLIPModel, ViTModel, AutoModel # Add AutoModel
 from typing import Optional
 
 class CLIPBinaryClassifier(nn.Module):
-    def __init__(self, model_type, model_name="openai/clip-vit-base-patch32", hidden_dim=128, use_linear_probing: bool = False): # Removed clip_transformer_block_index
+    def __init__(self, model_type, model_name="openai/clip-vit-base-patch32", hidden_dim=128, use_linear_probing: bool = False):
         super(CLIPBinaryClassifier, self).__init__()
         self.model_type = model_type.lower()
         self.use_linear_probing = use_linear_probing # Store use_linear_probing
@@ -34,21 +34,21 @@ class CLIPBinaryClassifier(nn.Module):
             self.classifier = nn.Linear(classification_head_input_dim, 1)
             print(f"Using Linear Probing head (vision embedding only) for {self.model_type}.")
         else:
-            classification_head_input_dim = vision_embedding_dim + 2 # Add 2 for original_image_size for MLP
+            # For MLP head: vision embedding only
+            classification_head_input_dim = vision_embedding_dim
             self.classifier = nn.Sequential(
                 nn.Linear(classification_head_input_dim, hidden_dim),
                 nn.LeakyReLU(0.2),
                 nn.Linear(hidden_dim, 1)
             )
-            print(f"Using MLP head (vision embedding + image size) for {self.model_type}.")
+            print(f"Using MLP head (vision embedding only) for {self.model_type}.")
 
-    def forward(self, pixel_values, original_image_size):
+    def forward(self, pixel_values, original_image_size=None):
         """
         Args:
             pixel_values: Tensor of preprocessed image data.
                           Expected shape: (batch_size, num_channels, height, width)
-            original_image_size: Tensor of original image sizes (width, height), potentially normalized.
-                                 Expected shape: (batch_size, 2). 
+            original_image_size: Not used anymore (kept for backward compatibility).
         """
         if self.model_type == "clip":
             # Get image features from the vision transformer part of CLIP
@@ -67,13 +67,8 @@ class CLIPBinaryClassifier(nn.Module):
         else:
             raise ValueError(f"Unsupported model_type during forward pass: {self.model_type}")
 
-        if self.use_linear_probing:
-            combined_features = cls_embedding
-        else:
-            if original_image_size is None:
-                raise ValueError("original_image_size must be provided for MLP head.")
-            original_image_size_f = original_image_size.float().to(cls_embedding.device)
-            combined_features = torch.cat((cls_embedding, original_image_size_f), dim=1)
+        # Use only vision embeddings for classification
+        combined_features = cls_embedding
         
         logits = self.classifier(combined_features)
         return logits

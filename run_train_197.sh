@@ -20,7 +20,7 @@ train_args=(
 
   # Training parameters
   --learning_rate 0.0001
-  --batch_size 1
+  --batch_size 32
   --num_epochs 100
   --model_type "dinov2"
   # --model_type "vit"
@@ -33,7 +33,7 @@ train_args=(
   --image_size 224
   --num_workers 8
   # --use_linear_probing
-  --patch_size 14
+  # --patch_size 14
 
   # --checkpoint_path "/home/hanta/minyeong/CLIPclassification/results/20250611_135517_dinolarge_256/clip_binary_classifier_final_epoch_100.pth"
 

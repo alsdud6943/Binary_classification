@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from model import CLIPBinaryClassifier
 
 # from data import CLIPDataset
-from data_keepratio import CLIPDataset
+from data import CLIPDataset
 
 import argparse # Import argparse
 import os # Import os for path operations

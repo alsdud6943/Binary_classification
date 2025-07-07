@@ -119,10 +119,10 @@ class CLIPDataset(torch.utils.data.Dataset):
 
 
 
-            # Convert original_image_size to a normalized FloatTensor using cropped dimensions
-            # Scaling width by 512 and height by 699.
+            # Convert original_image_size to actual pixel dimensions (no normalization)
+            # Use the actual width and height values directly
             original_image_size_tensor = torch.tensor(
-                [original_width / 512.0, original_height / 699.0], # Use cropped dimensions
+                [original_width, original_height], # Use actual pixel dimensions
                 dtype=torch.float
             )
             
